@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta http-equiv="refresh" content="10">
+
+    <title>AI SOC Dashboard</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #e5e7eb;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 25px;
+        }
+
+        /* =========================
+           STATISTICS
+        ========================= */
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #334155;
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .card p {
+            margin: 8px 0 0;
+            color: #94a3b8;
+        }
+
+        .HIGH {
+            color: #f87171;
+        }
+
+        .MEDIUM {
+            color: #fbbf24;
+        }
+
+        .LOW {
+            color: #4ade80;
+        }
+
+        .AI {
+            color: #93c5fd;
+        }
+
+        /* =========================
+           SECTIONS
+        ========================= */
+
+        .section {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #334155;
+            margin-bottom: 25px;
+        }
+
+        .section h2 {
+            margin-top: 0;
+        }
+
+        /* =========================
+           ALERT TYPE SUMMARY
+        ========================= */
+
+        .alert-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .alert-type {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .alert-type-name {
+            font-weight: bold;
+        }
+
+        .alert-type-count {
+            margin-top: 8px;
+            font-size: 24px;
+            color: #93c5fd;
+        }
+
+        /* =========================
+           TABLE
+        ========================= */
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1250px;
+        }
+
+        th {
+            background: #334155;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+            vertical-align: top;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #263449;
+        }
+
+        .severity {
+            font-weight: bold;
+        }
+
+        .mitre {
+            color: #93c5fd;
+            font-weight: bold;
+        }
+
+        /* =========================
+           AI INVESTIGATION
+        ========================= */
+
+        .ai-box {
+            white-space: pre-wrap;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        .ai-pending {
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        /* =========================
+           STATUS
+        ========================= */
+
+        .status {
+            padding: 5px 8px;
+            border-radius: 5px;
+            background: #334155;
+            display: inline-block;
+            font-size: 12px;
+        }
+
+        /* =========================
+           RESPONSIVE
+        ========================= */
+
+        @media (max-width: 1200px) {
+
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 700px) {
+
+            body {
+                padding: 15px;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <h1>🛡️ AI SOC Dashboard</h1>
+
+    <div class="subtitle">
+        AI-Assisted Security Operations Center
+        • Auto-refresh: 10 seconds
+    </div>
+
+
+    <!-- =====================================================
+         STATISTICS
+    ====================================================== -->
+
+    <div class="stats">
+
+        <div class="card">
+            <h2>{{ total_alerts }}</h2>
+            <p>Total Alerts</p>
+        </div>
+
+        <div class="card">
+            <h2 class="HIGH">{{ high_alerts }}</h2>
+            <p>High Severity</p>
+        </div>
+
+        <div class="card">
+            <h2 class="MEDIUM">{{ medium_alerts }}</h2>
+            <p>Medium Severity</p>
+        </div>
+
+        <div class="card">
+            <h2 class="LOW">{{ low_alerts }}</h2>
+            <p>Low Severity</p>
+        </div>
+
+        <div class="card">
+            <h2 class="AI">{{ analyzed_alerts }}</h2>
+            <p>AI Investigated</p>
+        </div>
+
+        <div class="card">
+            <h2>{{ pending_ai }}</h2>
+            <p>AI Pending</p>
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         ALERT TYPE SUMMARY
+    ====================================================== -->
+
+    <div class="section">
+
+        <h2>Alert Type Summary</h2>
+
+        <div class="alert-summary">
+
+            {% for item in alert_types %}
+
+            <div class="alert-type">
+
+                <div class="alert-type-name">
+                    {{ item.alert_type }}
+                </div>
+
+                <div class="alert-type-count">
+                    {{ item.count }}
+                </div>
+
+                <div>
+                    alerts
+                </div>
+
+            </div>
+
+            {% else %}
+
+            <p>No alert types available.</p>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         SECURITY ALERTS
+    ====================================================== -->
+
+    <div class="section">
+
+        <h2>Security Alerts</h2>
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>ID</th>
+                        <th>Time</th>
+                        <th>Alert</th>
+                        <th>Source IP</th>
+                        <th>User</th>
+                        <th>Severity</th>
+                        <th>MITRE ATT&CK</th>
+                        <th>AI Investigation</th>
+                        <th>Status</th>
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for alert in alerts %}
+
+                    <tr>
+
+                        <td>
+                            {{ alert.id }}
+                        </td>
+
+                        <td>
+                            {{ alert.timestamp }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ alert.alert_type }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ alert.source_ip }}
+                        </td>
+
+                        <td>
+                            {{ alert.username or "N/A" }}
+                        </td>
+
+                        <td class="severity {{ alert.severity }}">
+                            {{ alert.severity }}
+                        </td>
+
+                        <td class="mitre">
+                            {{ alert.mitre_technique or "Pending" }}
+                        </td>
+
+                        <td class="ai-box">
+
+                            {% if alert.ai_analysis %}
+
+                                {{ alert.ai_analysis }}
+
+                            {% else %}
+
+                                <span class="ai-pending">
+                                    AI analysis pending...
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            <span class="status">
+                                {{ alert.status }}
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+
+                        <td colspan="9">
+                            No alerts found.
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
