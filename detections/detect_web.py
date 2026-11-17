@@ -1,14 +1,25 @@
+
 import sys
 
 sys.path.append(".")
 
-from database.db import insert_alert
+from database.db import (
+    insert_alert,
+    is_event_processed,
+    mark_event_processed
+)
 
 LOG_FILE = "logs/security.log"
 
-with open(LOG_FILE, "r") as file:
+new_events = []
 
+# Read only new events
+with open(LOG_FILE, "r") as file:
     for line in file:
+        line = line.strip()
+
+        if not line or is_event_processed(line):
+            continue
 
         parts = [part.strip() for part in line.split("|")]
 
@@ -17,28 +28,40 @@ with open(LOG_FILE, "r") as file:
 
         timestamp, event_type, source_ip, username, action = parts
 
-        if action == "SQL_INJECTION_ATTEMPT":
+        new_events.append(
+            (line, timestamp, source_ip, username, action)
+        )
 
-            severity = "HIGH"
+# Detect SQL injection attempts
+for line, timestamp, source_ip, username, action in new_events:
 
-            description = (
-                "Possible SQL injection attempt detected "
-                "against a web application."
-            )
+    if action == "SQL_INJECTION_ATTEMPT":
 
-            insert_alert(
-                timestamp,
-                "SQL Injection Attempt",
-                source_ip,
-                username,
-                severity,
-                description
-            )
+        severity = "HIGH"
+        description = (
+            "Possible SQL injection attempt detected "
+            "against a web application."
+        )
 
-            print("\n🚨 SECURITY ALERT")
-            print("-------------------------")
-            print("Alert Type : SQL Injection Attempt")
-            print("Source IP  :", source_ip)
-            print("Timestamp  :", timestamp)
-            print("Severity   :", severity)
-            print("Stored in  : SQLite database")
+        insert_alert(
+            timestamp,
+            "SQL Injection Attempt",
+            source_ip,
+            username,
+            severity,
+            description
+        )
+
+        print("\n🚨 SECURITY ALERT")
+        print("-------------------------")
+        print("Alert Type :", "SQL Injection Attempt")
+        print("Source IP  :", source_ip)
+        print("Timestamp  :", timestamp)
+        print("Severity   :", severity)
+        print("Stored in  : SQLite database")
+
+# Mark all valid new events as processed
+for line, timestamp, source_ip, username, action in new_events:
+    mark_event_processed(line)
+
+print(f"\nProcessed {len(new_events)} new security event(s).")

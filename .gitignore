@@ -9,3 +9,8 @@ database/soc.db
 logs/*.log
 
 .env
+backups/
+
+# Local backup files
+*.backup
+*.before_*

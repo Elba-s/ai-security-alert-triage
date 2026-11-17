@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 import sqlite3
 
 app = Flask(__name__)
@@ -85,6 +85,7 @@ def dashboard():
             source_ip,
             username,
             severity,
+	    description,
             mitre_technique,
             ai_analysis,
             status
@@ -115,6 +116,57 @@ def dashboard():
 
         alerts=alerts
     )
+
+@app.route("/api/alerts")
+def api_alerts():
+
+    db = get_database()
+
+    alerts = db.execute("""
+        SELECT
+            id,
+            timestamp,
+            alert_type,
+            source_ip,
+            username,
+            severity,
+	    description,
+            mitre_technique,
+            ai_analysis,
+            status
+        FROM alerts
+        ORDER BY id DESC
+    """).fetchall()
+
+    db.close()
+
+    return jsonify([
+        dict(alert) for alert in alerts
+    ])
+@app.route("/api/unclassified")
+def api_unclassified():
+
+    db = get_database()
+
+    events = db.execute("""
+        SELECT
+            id,
+            timestamp,
+            event_type,
+            source_ip,
+            username,
+            action,
+            classification,
+            raw_event
+        FROM unclassified_events
+        ORDER BY id DESC
+    """).fetchall()
+
+    db.close()
+
+    return jsonify([
+        dict(event) for event in events
+    ])
 
 
 if __name__ == "__main__":

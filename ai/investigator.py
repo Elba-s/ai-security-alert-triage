@@ -2,7 +2,6 @@ import sqlite3
 import subprocess
 import re
 
-
 DATABASE = "database/soc.db"
 
 
@@ -302,31 +301,30 @@ Keep each section to one short sentence.
     # FINDING FALLBACKS
     # ========================================================
 
-    if not finding:
+    finding_map = {
 
-       finding_map = {
+        "Possible Brute Force":
+            "Multiple failed login attempts detected.",
 
-    "Possible Brute Force":
-        "Multiple failed login attempts detected.",
+        "Network Port Scan":
+            "Multiple network ports detected during scanning activity.",
 
-    "Network Port Scan":
-        "Multiple network ports detected during scanning activity.",
+        "SQL Injection Attempt":
+            "Possible SQL injection attempt detected against a web application.",
 
-    "SQL Injection Attempt":
-        "Possible SQL injection attempt detected against a web application.",
+        "Privilege Escalation":
+            "Possible privilege escalation activity detected.",
 
-    "Privilege Escalation":
-        "Possible privilege escalation activity detected.",
-
-    "Suspicious Process Execution":
-        "Unexpected process execution detected."
+        "Suspicious Process Execution":
+            "Unexpected process execution detected."
 
     }
 
-    finding = finding_map.get(
-        alert_type,
-        "Investigate the alert and collect additional evidence before containment."
-    )
+    if not finding:
+        finding = finding_map.get(
+            alert_type,
+            "Investigate the alert and collect additional evidence before containment."
+        )
 
     # ========================================================
     # RISK FALLBACKS
@@ -470,27 +468,179 @@ Recommended Action:
 
     return final_output
 
+# ============================================================
+# GROUNDING VERIFIER
+# ============================================================
+
+def verify_grounding(analysis, description):
+       # Deterministic check: detect invented usernames.
+    usernames = re.findall(
+        r"\b(?:user|username)\s+([A-Za-z][A-Za-z0-9_.-]*)",
+        analysis,
+        re.IGNORECASE
+    )
+
+    for username in usernames:
+        if username.lower() not in description.lower():
+            print(f"Unsupported username detected: {username}")
+            return "UNGROUNDED"
+        # Deterministic check: detect unsupported confirmed attack claims.
+    confirmed_attack_patterns = [
+        r"\bbrute force attack in progress\b",
+        r"\bconfirmed brute force attack\b",
+        r"\bsuccessful account compromise\b",
+        r"\battacker successfully accessed\b",
+        r"\bdata exfiltration confirmed\b"
+    ]
+
+    evidence_lower = description.lower()
+    analysis_lower = analysis.lower()
+
+    for pattern in confirmed_attack_patterns:
+        if re.search(pattern, analysis_lower):
+            if not re.search(pattern, evidence_lower):
+                print("Unsupported confirmed attack claim detected.")
+                return "UNGROUNDED"
+    prompt = f"""
+You are a cybersecurity evidence-grounding auditor.
+
+Compare the AI investigation with the original alert evidence.
+
+ORIGINAL EVIDENCE:
+{description}
+
+AI INVESTIGATION:
+{analysis}
+
+CLASSIFICATION RULES:
+
+1. GROUNDED:
+   - Factual claims are supported by the original evidence.
+   - Reasonable security interpretations are allowed when
+     expressed cautiously using words like possible or potential.
+   - Recommendations do not need to be directly present in the evidence.
+   - The investigation does not contradict the original evidence.
+
+2. UNGROUNDED:
+   - The investigation invents usernames, IP addresses,
+     timestamps, event counts, commands or other specific details.
+   - It claims an event occurred when the evidence does not support it.
+   - It presents an unconfirmed attack or consequence as a confirmed fact.
+   - It contradicts the original evidence.
+
+3. NO CHECKABLE CLAIMS:
+   - The investigation contains no meaningful factual claims
+     that can be compared with the evidence.
+   - It contains only generic recommendations or vague statements.
+
+IMPORTANT DISTINCTIONS:
+
+- "Potential account compromise" is a qualified risk,
+  not a claim that compromise definitely happened.
+- "Account compromise confirmed" requires supporting evidence.
+- "Possible privilege escalation" can be a reasonable
+  interpretation of unexpected privileged command execution.
+- A username or IP address must never be invented.
+- A recommendation such as "investigate the login activity"
+  is not an unsupported factual claim.
+- Missing details alone do not make an investigation ungrounded.
+- If at least one important factual claim is unsupported,
+  classify the investigation as UNGROUNDED.
+
+EXAMPLES:
+
+Evidence: Four failed SSH login attempts.
+Investigation: Four failed SSH login attempts were detected.
+Answer: GROUNDED
+
+Evidence: Four failed SSH login attempts.
+Investigation: The attacker successfully accessed root.
+Answer: UNGROUNDED
+
+Evidence: Multiple failed login attempts detected.
+Investigation: Multiple failed login attempts detected for user admin.
+Answer: UNGROUNDED
+
+Evidence: Unexpected privileged command execution detected.
+Investigation: Possible privilege escalation activity detected.
+Answer: GROUNDED
+
+Evidence: Multiple failed logins followed by successful login.
+Investigation: Potential account compromise.
+Answer: GROUNDED
+
+Evidence: Security event recorded.
+Investigation: Further investigation is recommended.
+Answer: NO CHECKABLE CLAIMS
+
+Return exactly ONE of these verdicts:
+
+GROUNDED
+UNGROUNDED
+NO CHECKABLE CLAIMS
+
+Do not provide explanations.
+"""
+
+    try:
+        result = subprocess.run(
+            [
+                "ollama",
+                "run",
+                "qwen3:0.6b",
+                "--think=false",
+                prompt
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+    except (subprocess.TimeoutExpired, OSError):
+        return "NO CHECKABLE CLAIMS"
+
+    if result.returncode != 0:
+        return "NO CHECKABLE CLAIMS"
+
+    verdict = clean_output(result.stdout).strip().upper()
+
+    allowed_verdicts = {
+        "GROUNDED",
+        "UNGROUNDED",
+        "NO CHECKABLE CLAIMS"
+    }
+
+    if verdict not in allowed_verdicts:
+        return "NO CHECKABLE CLAIMS"
+
+    return verdict
+
 
 # ============================================================
 # SAVE ANALYSIS
 # ============================================================
 
-def save_analysis(alert_id, analysis):
+def save_analysis(alert_id, analysis, alert_type, description):
 
     connection = sqlite3.connect(DATABASE)
-    cursor = connection.cursor()
 
-    cursor.execute("""
-        UPDATE alerts
-        SET ai_analysis = ?
-        WHERE id = ?
-    """, (
-        analysis,
-        alert_id
-    ))
+    try:
+        cursor = connection.cursor()
 
-    connection.commit()
-    connection.close()
+        cursor.execute("""
+            UPDATE alerts
+            SET ai_analysis = ?
+            WHERE id = ?
+        """, (
+            analysis,
+            alert_id
+        ))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
 
 
 # ============================================================
@@ -575,7 +725,9 @@ def main():
 
             save_analysis(
                 alert_id,
-                analysis
+                analysis,
+		alert_type,
+		description
             )
 
 

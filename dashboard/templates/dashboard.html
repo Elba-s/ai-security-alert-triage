@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta http-equiv="refresh" content="10">
 
     <title>AI SOC Dashboard</title>
 
@@ -164,7 +163,7 @@
            AI INVESTIGATION
         ========================= */
 
-        .ai-box {
+        ai-box {
             white-space: pre-wrap;
             max-width: 500px;
             line-height: 1.5;
@@ -209,6 +208,32 @@
             }
         }
 
+    .ai-investigation {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 220px;
+    }
+
+    .ai-section {
+        padding: 10px 12px;
+        border: 1px solid #444;
+        border-radius: 8px;
+        background: rgba(128, 128, 128, 0.06);
+    }
+
+    .ai-section-title {
+        font-weight: 700;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    .ai-section-content {
+        font-size: 13px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+    }
+
     </style>
 
 </head>
@@ -220,7 +245,7 @@
 
     <div class="subtitle">
         AI-Assisted Security Operations Center
-        • Auto-refresh: 10 seconds
+        • Auto-refresh: 5 seconds
     </div>
 
 
@@ -331,7 +356,7 @@
                 </thead>
 
 
-                <tbody>
+                <tbody id="alerts-body">
 
                     {% for alert in alerts %}
 
@@ -363,23 +388,34 @@
                             {{ alert.severity }}
                         </td>
 
-                        <td class="mitre">
-                            {{ alert.mitre_technique or "Pending" }}
-                        </td>
+			<td class="mitre">
+    			    <div>
+        			<strong>Rule:</strong>
+        			{{ alert.mitre_technique or "Pending" }}
+    			    </div>
+
+			</td>
+
 
                         <td class="ai-box">
+                             <div>
+        			 <strong>Alert Evidence:</strong>
+                                 <p>{{ alert.description or "No evidence description available" }}</p>
+    			      </div>
 
-                            {% if alert.ai_analysis %}
+    			      <hr>
 
-                                {{ alert.ai_analysis }}
+    			 <div>
+        <strong>AI Investigation:</strong>
 
-                            {% else %}
-
-                                <span class="ai-pending">
-                                    AI analysis pending...
-                                </span>
-
-                            {% endif %}
+        {% if alert.ai_analysis %}
+            <p>{{ alert.ai_analysis }}</p>
+        {% else %}
+            <span class="ai-pending">
+                AI analysis pending...
+            </span>
+        {% endif %}
+    </div>
 
                         </td>
 
@@ -412,6 +448,237 @@
         </div>
 
     </div>
+    <!-- =====================================================
+     UNCLASSIFIED EVENTS
+====================================================== -->
+
+<div class="section">
+
+    <h2>Unclassified Events</h2>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Time</th>
+                    <th>Event Type</th>
+                    <th>Source IP</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Classification</th>
+                    <th>Raw Event</th>
+                </tr>
+            </thead>
+
+            <tbody id="unclassified-body">
+                <tr>
+                    <td colspan="8">Loading events...</td>
+                </tr>
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script>
+    const alertsBody = document.getElementById("alerts-body");
+    const unclassifiedBody = document.getElementById("unclassified-body");
+    function addCell(row, text, className = "") {
+        const cell = document.createElement("td");
+
+        if (className) {
+            cell.className = className;
+        }
+
+        cell.textContent = text ?? "";
+        row.appendChild(cell);
+
+        return cell;
+    }
+
+        function renderUnclassified(events) {
+        unclassifiedBody.replaceChildren();
+
+        if (events.length === 0) {
+            const row = document.createElement("tr");
+            const cell = addCell(row, "No unclassified events found.");
+            cell.colSpan = 8;
+            unclassifiedBody.appendChild(row);
+            return;
+        }
+
+        for (const event of events) {
+            const row = document.createElement("tr");
+
+            addCell(row, event.id);
+            addCell(row, event.timestamp);
+            addCell(row, event.event_type);
+            addCell(row, event.source_ip);
+            addCell(row, event.username);
+            addCell(row, event.action);
+
+            const classificationCell = addCell(row, event.classification);
+            classificationCell.className = "severity " + event.classification;
+
+            addCell(row, event.raw_event);
+
+            unclassifiedBody.appendChild(row);
+        }
+    }
+
+    async function refreshUnclassified() {
+        try {
+            const response = await fetch("/api/unclassified", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("HTTP error: " + response.status);
+            }
+
+            const events = await response.json();
+            renderUnclassified(events);
+
+        } catch (error) {
+            console.warn("Could not refresh unclassified events:", error);
+        }
+    }
+
+    function addLabelValue(container, label, value) {
+        const div = document.createElement("div");
+        const strong = document.createElement("strong");
+
+        strong.textContent = label;
+        div.appendChild(strong);
+        div.appendChild(document.createTextNode(" " + (value || "")));
+
+        container.appendChild(div);
+    }
+
+    function renderAlerts(alerts) {
+        alertsBody.replaceChildren();
+
+        if (alerts.length === 0) {
+            const row = document.createElement("tr");
+            const cell = addCell(row, "No alerts found.");
+            cell.colSpan = 9;
+            alertsBody.appendChild(row);
+            return;
+        }
+
+        for (const alert of alerts) {
+            const row = document.createElement("tr");
+
+            addCell(row, alert.id);
+            addCell(row, alert.timestamp);
+            addCell(row, alert.alert_type);
+            addCell(row, alert.source_ip || "N/A");
+            addCell(row, alert.username || "N/A");
+
+            const severityCell = addCell(row, alert.severity, "severity");
+
+            if (["HIGH", "MEDIUM", "LOW"].includes(alert.severity)) {
+                severityCell.classList.add(alert.severity);
+            }
+
+            const mitreCell = document.createElement("td");
+            mitreCell.className = "mitre";
+
+            addLabelValue(mitreCell, "Rule:", alert.mitre_technique || "Pending");
+
+
+
+            row.appendChild(mitreCell);
+
+            const aiCell = addCell(row, "", "ai-box");
+
+
+            if (alert.ai_analysis) {
+                const sections = [
+                    { label: "Finding", icon: "🔎", pattern: /Finding:\s*([\s\S]*?)(?=Risk:|Evidence:|MITRE ATT&CK:|Recommended Action:|$)/i },
+                    { label: "Risk Assessment", icon: "⚠️", pattern: /Risk:\s*([\s\S]*?)(?=Finding:|Evidence:|MITRE ATT&CK:|Recommended Action:|$)/i },
+                    { label: "Evidence", icon: "📋", pattern: /Evidence:\s*([\s\S]*?)(?=Finding:|Risk:|MITRE ATT&CK:|Recommended Action:|$)/i },
+                    { label: "MITRE ATT&CK", icon: "🎯", pattern: /MITRE ATT&CK:\s*([\s\S]*?)(?=Finding:|Risk:|Evidence:|Recommended Action:|$)/i },
+                    { label: "Recommended Actions", icon: "🛠️", pattern: /Recommended Action:\s*([\s\S]*?)$/i }
+                ];
+
+                const investigation = document.createElement("div");
+                investigation.className = "ai-investigation";
+
+                sections.forEach(section => {
+                    const match = alert.ai_analysis.match(section.pattern);
+
+                    if (match && match[1].trim()) {
+                        const card = document.createElement("div");
+                        card.className = "ai-section";
+
+                        const heading = document.createElement("div");
+                        heading.className = "ai-section-title";
+                        heading.textContent = `${section.icon} ${section.label}`;
+
+                        const content = document.createElement("div");
+                        content.className = "ai-section-content";
+                        content.textContent = match[1].trim();
+
+                        card.appendChild(heading);
+                        card.appendChild(content);
+                        investigation.appendChild(card);
+                    }
+                });
+
+                if (investigation.children.length > 0) {
+                    aiCell.appendChild(investigation);
+                } else {
+                    aiCell.textContent = alert.ai_analysis;
+                }
+            } else {
+                const pending = document.createElement("span");
+                pending.className = "ai-pending";
+                pending.textContent = "AI analysis pending...";
+                aiCell.appendChild(pending);
+            }
+
+
+            const statusCell = document.createElement("td");
+            const statusSpan = document.createElement("span");
+            statusSpan.className = "status";
+            statusSpan.textContent = alert.status || "NEW";
+            statusCell.appendChild(statusSpan);
+            row.appendChild(statusCell);
+
+            alertsBody.appendChild(row);
+        }
+    }
+
+    async function refreshAlerts() {
+        try {
+            const response = await fetch("/api/alerts", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("HTTP error: " + response.status);
+            }
+
+            const alerts = await response.json();
+            renderAlerts(alerts);
+
+        } catch (error) {
+            console.warn("Could not refresh alerts:", error);
+        }
+    }
+
+    refreshAlerts();
+    refreshUnclassified();
+
+    setInterval(refreshAlerts, 5000);
+    setInterval(refreshUnclassified, 5000);
+</script>
 
 </body>
 
