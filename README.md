@@ -1,10 +1,10 @@
-#  🛡️ AI Security Alert Triage
+# 🛡️ AI Security Alert Triage
 
 An AI-assisted Security Operations Center (SOC) project that detects suspicious security activity, correlates authentication events, stores and enriches alerts, maps detections to MITRE ATT&CK techniques, and uses a local LLM to assist analysts during initial alert triage.
 
 The project is designed as a lightweight, locally deployable SOC environment using Python, SQLite, Flask, and Ollama.
 
-  **Important:** The AI is an analyst-assistance component. It does not autonomously make containment or remediation decisions. Final decisions remain with the human analyst.
+> **Important:** AI is an analyst-assistance component. It does not autonomously make containment or remediation decisions. Final decisions remain with the human analyst.
 
 ---
 
@@ -14,7 +14,7 @@ Security Operations Centers receive large numbers of alerts that need to be inve
 
 This project demonstrates a simplified SOC alert-triage workflow:
 
-
+```text
 Security Event
       ↓
 Detection
@@ -30,11 +30,9 @@ AI-Assisted Investigation
 SOC Dashboard
       ↓
 Human Analyst Review
+```
 
-
-
-
-## The main objectives of the project are to:
+### Project Objectives
 
 - Detect suspicious security activity using rule-based detection.
 - Correlate related authentication events within a time window.
@@ -47,62 +45,59 @@ Human Analyst Review
 - Provide a web-based SOC dashboard.
 - Demonstrate how AI can assist rather than replace a security analyst.
 
+---
 
 ## 🏗️ System Architecture
-                  
 
-                     Synthetic Security Logs
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │  Detection Engine  │
-                    └─────────┬──────────┘
-                              │
-             ┌────────────────┼────────────────┐
-             │                │                │
-             ▼                ▼                ▼
-      Authentication      Network            Web
-         Detection        Detection        Detection
-             │                │                │
-             └────────────────┼────────────────┘
-                              │
-                              ▼
-                       SQLite Database
-                              │
-                 ┌────────────┴────────────┐
-                 │                         │
-                 ▼                         ▼
-          MITRE ATT&CK              AI Investigation
-             Mapping                       │
-                 │                         │
-                 └────────────┬────────────┘
-                              ▼
-                    Flask SOC Dashboard
-                              │
-                              ▼
-                       Human Analyst
+```text
+                Synthetic Security Logs
+                         │
+                         ▼
+                ┌────────────────────┐
+                │  Detection Engine  │
+                └─────────┬──────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          │               │               │
+          ▼               ▼               ▼
+   Authentication     Network            Web
+     Detection       Detection        Detection
+          │               │               │
+          └───────────────┼───────────────┘
+                          │
+                          ▼
+                   SQLite Database
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+       MITRE ATT&CK           AI Investigation
+          Mapping                     │
+              │                       │
+              └───────────┬───────────┘
+                          ▼
+                 Flask SOC Dashboard
+                          │
+                          ▼
+                   Human Analyst
+```
 
+### Architecture Notes
 
+- The current implementation uses synthetic security logs.
+- Detection components generate alerts that are stored in SQLite.
+- MITRE ATT&CK mapping and AI investigation are separate enrichment stages.
+- MITRE mapping is based on predefined detection-to-technique mappings.
+- The AI is not treated as the authoritative source for MITRE ATT&CK assignment.
+- The final alert is presented through the dashboard for human review.
 
-
-## Architecture notes
-
-The current implementation uses synthetic security logs.
-
-The detection components generate alerts that are stored in SQLite.
-
-MITRE ATT&CK mapping and AI investigation are currently separate enrichment stages operating on the stored alert.
-
-The AI is not treated as the authoritative source for MITRE ATT&CK assignment.
-
-The final alert is presented through the dashboard for human review
-
+---
 
 ## 📥 Data Source
 
 The current implementation uses synthetic security logs generated to simulate security events.
 
-The logs are designed to represent activities such as:
+The logs represent activities such as:
 
 - Authentication failures
 - Successful authentication
@@ -114,7 +109,7 @@ The logs are designed to represent activities such as:
 
 Synthetic logs allow the detection pipeline to be tested in a controlled environment without using sensitive production data.
 
-**Future data sources**
+### Future Data Sources
 
 Future versions may evaluate the system using public cybersecurity datasets such as:
 
@@ -125,31 +120,35 @@ Future versions may evaluate the system using public cybersecurity datasets such
 
 These datasets are not currently part of the implemented pipeline.
 
+---
 
 ## 🔍 Detection Capabilities
 
-The project currently supports several security alert types.
+The project uses rule-based detection rather than machine-learning-based detection.
 
-Detection Type  	        Description	                               Severity Examples	MITRE ATT&CK
-Possible Brute Force	        Detects repeated authentication failures       MEDIUM / HIGH	        T1110
-Network Port Scan	        Detects possible network reconnaissance	       MEDIUM	                T1046
-SQL Injection Attempt	        Detects possible SQL injection activity	       HIGH			T1190
-Suspicious Process Execution	Detects unexpected process execution	       MEDIUM			Unknown - Requires Investigation 
-Privilege Escalation	        Detects possible privilege escalation	       HIGH			T1068
+| Detection Type | Description | Example Severity | MITRE ATT&CK |
+|---|---|---|---|
+| Possible Brute Force | Detects repeated authentication failures | MEDIUM / HIGH | T1110 |
+| Network Port Scan | Detects possible network reconnaissance | MEDIUM | T1046 |
+| SQL Injection Attempt | Detects possible SQL injection activity | HIGH | T1190 |
+| Suspicious Process Execution | Additional alert type present in evaluation; implementation requires validation | MEDIUM | Requires investigation |
+| Privilege Escalation | Additional alert type present in evaluation; implementation requires validation | HIGH | T1068 |
 
-- The system currently uses rule-based detection rather than machine-learning-based detection.
+Detection rules identify suspicious activity based on predefined conditions and event patterns.
 
-
+---
 
 ## 🔐 Authentication Event Correlation
 
 One of the main detection improvements in the project is time-based authentication event correlation.
 
-The authentication detector uses a five-minute correlation window.
+The authentication detector uses a **five-minute correlation window**.
 
-Instead of simply counting failed login attempts throughout the entire log, the detector checks whether related events occur within the same five-minute window.
+Instead of simply counting failed login attempts throughout the entire log, the detector checks whether related authentication events occur within the same five-minute window.
 
+### Detection Logic
 
+```text
 LOGIN_FAILED
 LOGIN_FAILED
 LOGIN_FAILED
@@ -165,7 +164,7 @@ Possible Brute Force
        ├──────────────────┐
        │                  │
        ▼                  ▼
-No successful login    Successful login
+No successful login  Successful login
        │                  │
        ▼                  ▼
     MEDIUM              HIGH
@@ -175,80 +174,121 @@ No successful login    Successful login
                           │
                           ▼
                          HIGH
+```
 
+### Authentication Correlation Features
 
+- Detects five failed login attempts within a five-minute window.
+- Correlates authentication events across monitoring cycles.
+- Detects a subsequent successful login associated with the suspicious activity.
+- Considers sudo activity as additional evidence.
+- Escalates the alert severity when additional suspicious activity is observed.
+- Prevents repeated detection from unnecessarily creating duplicate alerts.
+- Updates an existing alert when additional evidence changes its severity.
 
-## The current system does not perform cross-source correlation such as:
+The authentication detector uses the security log to reconstruct related events, allowing correlation to continue even when the monitoring process runs in separate cycles.
+
+### Severity Interpretation
+
+| Scenario | Severity |
+|---|---|
+| Five failed login attempts within the correlation window | MEDIUM |
+| Failed attempts followed by successful login | HIGH |
+| Failed attempts followed by successful login and sudo activity | HIGH |
+
+---
+
+## 🔗 Cross-Source Correlation
+
+The current system does not perform complete cross-source correlation such as:
+
+```text
 Port Scan
     ↓
 SQL Injection
     ↓
 Same Source IP
+    ↓
+Correlated Incident
+```
 
-- Cross-source correlation is a future enhancement.
+Correlating network, authentication, and web events into a single incident is a future enhancement.
 
+---
 
 ## 🧠 MITRE ATT&CK Mapping
+
+MITRE ATT&CK mapping is performed separately from AI investigation using predefined mappings for supported alert types.
+
+### Possible Brute Force
+
+```text
 Possible Brute Force
         ↓
 T1110 - Brute Force
+```
 
+### Network Port Scan
 
-
+```text
 Network Port Scan
         ↓
 T1046 - Network Service Scanning
+```
 
+### SQL Injection Attempt
 
-
+```text
 SQL Injection Attempt
         ↓
 T1190 - Exploit Public-Facing Application
+```
 
+### Privilege Escalation
 
-
+```text
 Privilege Escalation
         ↓
 T1068 - Exploitation for Privilege Escalation
+```
 
+If an alert type does not have a defined mapping, the system can return:
 
-**If an alert type does not have a defined mapping, the system can return:**
-   **Unknown - Requires Investigation**
+**Unknown - Requires Investigation**
 
+MITRE mapping is rule-based and should be validated by an analyst before being used as a definitive description of an incident.
 
+---
 
 ## 🤖 AI-Assisted Alert Investigation
 
-The project uses a local LLM through Ollama to assist with security alert investigation.
+The project uses a local Large Language Model (LLM) through Ollama to assist with security alert investigation.
 
 The AI produces structured investigation information including:
 
-- Finding
+### Finding
 
 Explains what the alert may represent.
 
-- Risk
+### Risk
 
 Describes the potential security impact.
 
-- Evidence
+### Evidence
 
 Presents the evidence associated with the detection.
 
-- MITRE ATT&CK
+### Recommended Action
 
-Provides a technique when sufficient information or an existing mapping is available.
+Suggests an investigation or response step for the analyst.
 
-- Recommended Action
+The exact wording generated by the local model may vary.
 
-Suggests an investigation or response step for the analyst
+> AI output should be treated as advisory information, not as an authoritative security decision.
 
-**The exact wording generated by the local model may vary.**
+The AI does not autonomously perform containment or remediation.
 
-**The AI output should be treated as advisory information, not as an authoritative security decision.**
-
-
-
+---
 
 ## 🗄️ Database
 
@@ -269,6 +309,7 @@ The database stores information including:
 
 The system also maintains information about processed security events to reduce duplicate event processing.
 
+---
 
 ## 📊 SOC Dashboard
 
@@ -291,16 +332,17 @@ The dashboard provides visibility into:
 
 The dashboard allows the analyst to view the results of the detection and enrichment pipeline from a single interface.
 
-
+---
 
 ## 🔎 Evidence
 
 The system was tested using synthetic security events representing different attack and suspicious-activity scenarios.
 
-Sample Raw Security Events
+### Sample Raw Security Events
 
 Example authentication activity:
 
+```text
 2026-09-23 09:02:31 | AUTH | 192.168.1.25 | admin | LOGIN_FAILED
 2026-09-23 09:02:35 | AUTH | 192.168.1.25 | admin | LOGIN_FAILED
 2026-09-23 09:02:39 | AUTH | 192.168.1.25 | admin | LOGIN_FAILED
@@ -308,24 +350,30 @@ Example authentication activity:
 2026-09-23 09:02:47 | AUTH | 192.168.1.25 | admin | LOGIN_FAILED
 2026-09-23 09:03:02 | AUTH | 192.168.1.25 | admin | LOGIN_SUCCESS
 2026-09-23 09:03:15 | SYSTEM | 192.168.1.25 | admin | SUDO_EXECUTED
+```
 
-The detector identifies the related authentication events within the five-minute correlation window
+The detector identifies the related authentication events within the five-minute correlation window.
 
-   Detection result:
+### Detection Result
 
+```text
 SECURITY ALERT
 -------------------------
-Alert Type      : Possible Brute Force
-Source IP       : 192.168.1.25
-Username        : admin
+
+Alert Type       : Possible Brute Force
+Source IP        : 192.168.1.25
+Username         : admin
 Failed Logins   : 5
-Successful Login: YES
+Successful Login : YES
 Sudo Activity   : YES
 Risk Assessment : HIGH
 Correlation     : 5-minute window
-Stored in       : SQLite database
+Stored In      : SQLite database
+```
 
----------- AI ANALYSIS ----------
+### Sample AI Analysis
+
+```text
 Finding:
 Multiple failed login attempts detected.
 
@@ -333,17 +381,16 @@ Risk:
 Potential unauthorized access or account compromise.
 
 Evidence:
-Multiple failed logins within a 5-minute window followed by successful login and sudo activity.
-
-MITRE ATT&CK:
-T1110 - Brute Force
+Multiple failed logins within a 5-minute window followed by
+successful login and sudo activity.
 
 Recommended Action:
 Investigate the login activity before taking containment actions.
+```
 
-**The detection engine supplies the underlying alert and evidence, while the AI assists with interpretation and investigation.**
+The detection engine supplies the underlying alert and evidence, while the AI assists with interpretation and investigation.
 
-
+---
 
 ## 📈 Evaluation
 
@@ -355,22 +402,31 @@ An initial evaluation produced:
 - AI analyzed: 16
 - MITRE mapped: 16
 
-Alert Distribution:
+### Alert Distribution
 
-- Possible Brute Force          8
-- SQL Injection Attempt         3
-- Network Port Scan             3
-- Suspicious Process Execution  1
-- Privilege Escalation          1
+| Alert Type | Count |
+|---|---:|
+| Possible Brute Force | 8 |
+| SQL Injection Attempt | 3 |
+| Network Port Scan | 3 |
+| Suspicious Process Execution | 1 |
+| Privilege Escalation | 1 |
+| **Total** | **16** |
 
-Severity Distribution:
+### Severity Distribution
 
-- HIGH       10
-- MEDIUM      6
-- LOW         0
+| Severity | Count |
+|---|---:|
+| HIGH | 10 |
+| MEDIUM | 6 |
+| LOW | 0 |
+| **Total** | **16** |
 
+These figures represent an initial evaluation using synthetic events and should not be interpreted as real-world detection accuracy.
 
-## AI accuracy
+---
+
+## 🎯 AI Accuracy
 
 A formal AI accuracy evaluation has not yet been performed.
 
@@ -389,22 +445,27 @@ Possible evaluation metrics include:
 - False-negative rate
 - Analyst triage time
 
+---
 
 ## 🛠️ Technology Stack
 
-Component		Technology
-Programming Language	Python
-Database		SQLite
-Web Framework		Flask
-AI Runtime		Ollama
-Threat Framework	MITRE ATT&CK
-Operating Environment	Linux / Kali Linux
-Version Control		Git
-Dashboard		Flask + HTML/CSS
+| Component | Technology |
+|---|---|
+| Programming Language | Python |
+| Database | SQLite |
+| Web Framework | Flask |
+| AI Runtime | Ollama |
+| Local LLM | Qwen3 0.6B |
+| Threat Framework | MITRE ATT&CK |
+| Operating Environment | Linux / Kali Linux |
+| Version Control | Git |
+| Dashboard | Flask + HTML/CSS |
 
+---
 
 ## 📁 Project Structure
 
+```text
 ai-security-alert-triage/
 │
 ├── ai/
@@ -424,7 +485,8 @@ ai-security-alert-triage/
 │   ├── detect_auth.py
 │   ├── detect_network.py
 │   ├── detect_web.py
-│   └── mitre_mapping.py
+│   ├── mitre_mapping.py
+│   └── unknown_event_handler.py
 │
 ├── logs/
 │
@@ -435,7 +497,9 @@ ai-security-alert-triage/
 ├── .gitignore
 │
 └── README.md
+```
 
+---
 
 ## 🔒 Security Considerations
 
@@ -443,15 +507,15 @@ This project is intended for educational, portfolio, and laboratory use.
 
 It should not be considered production-ready without additional security controls.
 
-- Dashboard Authentication
+### Dashboard Authentication
 
 The current Flask dashboard does not implement complete production-grade authentication and authorization.
 
-- Log Injection
+### Log Injection
 
 An attacker who can control log fields may be able to insert malicious or misleading content into the logs.
 
-- AI Prompt Injection
+### AI Prompt Injection
 
 Security logs can contain attacker-controlled text.
 
@@ -459,19 +523,20 @@ For example, a malicious User-Agent, username, URL parameter, or other field cou
 
 Therefore, AI output must be treated as untrusted advisory information.
 
-- Sensitive Information
+### Sensitive Information
 
 Production security logs may contain:
 
-Usernames
-IP addresses
-Hostnames
-Authentication information
-Tokens
-Other sensitive information
+- Usernames
+- IP addresses
+- Hostnames
+- Authentication information
+- Tokens
+- Other sensitive information
 
 Real production data should be handled according to appropriate security and privacy requirements.
 
+---
 
 ## ⚠️ Limitations
 
@@ -493,12 +558,11 @@ The current implementation has several limitations:
 - Formal AI accuracy and hallucination-rate measurements have not yet been performed.
 - The project does not perform autonomous incident containment.
 
+---
 
 ## 🔮 Future Improvements
 
-Possible future improvements include:
-
-Detection:
+### Detection
 
 - Additional authentication detections
 - Malware detection
@@ -508,7 +572,7 @@ Detection:
 - Cross-source event correlation
 - More MITRE ATT&CK techniques
 
-Data ingestion:
+### Data Ingestion
 
 - Wazuh integration
 - Sysmon integration
@@ -516,7 +580,7 @@ Data ingestion:
 - Public cybersecurity datasets
 - Network telemetry integration
 
-AI:
+### AI
 
 - Rule-based MITRE mapping supplied directly to the AI as context
 - Structured AI output validation
@@ -526,7 +590,7 @@ AI:
 - AI performance evaluation
 - Model comparison
 
-Dashboard:
+### Dashboard
 
 - User authentication
 - Role-based access control
@@ -538,7 +602,7 @@ Dashboard:
 - Alert status updates
 - Incident tracking
 
-SOC functionality:
+### SOC Functionality
 
 - Threat intelligence integration
 - Alert deduplication improvements
@@ -546,3 +610,11 @@ SOC functionality:
 - Automated notifications
 - Incident timelines
 - Case management
+
+---
+
+## 📌 Project Status
+
+This project is an ongoing cybersecurity learning and development project exploring the integration of rule-based security detection, event correlation, MITRE ATT&CK mapping, and local AI-assisted alert investigation.
+
+The goal is to build a transparent, lightweight SOC workflow in which detections and evidence remain the foundation of alert triage, while AI provides additional investigative support.
